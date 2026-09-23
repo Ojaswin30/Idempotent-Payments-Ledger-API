@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-900">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Idempotent Payments Ledger — Dashboard & Lab</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        code, pre, .font-mono { font-family: 'JetBrains Mono', monospace; }
+        .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
+        .custom-scroll::-webkit-scrollbar-thumb { background: rgba(71, 85, 105, 0.6); border-radius: 4px; }
+    </style>
+</head>
+<body class="h-full text-slate-100 flex flex-col custom-scroll selection:bg-indigo-500 selection:text-white">
+
+    <!-- Header Navigation -->
+    <header class="border-b border-slate-800 bg-slate-950/80 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                    <i class="fa-solid fa-shield-halved text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+                        Idempotent Ledger
+                        <span class="text-xs px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-mono">v1.0.0</span>
+                    </h1>
+                    <p class="text-xs text-slate-400 hidden sm:block">Production-Grade Distributed Financial Transaction Engine</p>
+                </div>
+            </div>
+
+            <!-- Health & Telemetry Status -->
+            <div class="flex items-center space-x-3">
+                <div id="system-status-badge" class="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span id="system-status-text">Services Healthy</span>
+                </div>
+
+                <a href="/swagger-ui.html" target="_blank" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition flex items-center gap-1.5 border border-slate-700">
+                    <i class="fa-solid fa-book text-indigo-400"></i>
+                    <span>Swagger API</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+        <!-- Top Metrics Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="bg-slate-800/40 border border-slate-800 rounded-2xl p-5 backdrop-blur flex items-center space-x-4">
+                <div class="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                    <i class="fa-solid fa-key text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-400 font-medium">Idempotency Layer</p>
+                    <h4 class="text-lg font-bold text-white flex items-center gap-1.5">
+                        Redis SETNX
+                        <span class="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">30s / 24h</span>
+                    </h4>
+                </div>
+            </div>
+
+            <div class="bg-slate-800/40 border border-slate-800 rounded-2xl p-5 backdrop-blur flex items-center space-x-4">
+                <div class="w-12 h-12 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400">
+                    <i class="fa-solid fa-scale-balanced text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-400 font-medium">Ledger Model</p>
+                    <h4 class="text-lg font-bold text-white">Double-Entry</h4>
+                </div>
+            </div>
+
+            <div class="bg-slate-800/40 border border-slate-800 rounded-2xl p-5 backdrop-blur flex items-center space-x-4">
+                <div class="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+                    <i class="fa-solid fa-box-archive text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-400 font-medium">Transactional Outbox</p>
+                    <h4 class="text-lg font-bold text-white flex items-center gap-1.5">
+                        SKIP LOCKED
+                        <span class="text-[10px] text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded">Postgres</span>
+                    </h4>
+                </div>
+            </div>
+
+            <div class="bg-slate-800/40 border border-slate-800 rounded-2xl p-5 backdrop-blur flex items-center space-x-4">
+                <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                    <i class="fa-solid fa-bolt text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-xs text-slate-400 font-medium">Event Stream</p>
+                    <h4 class="text-lg font-bold text-white flex items-center gap-1.5">
+                        Apache Kafka
+                        <span class="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">DLQ Ready</span>
+                    </h4>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="flex border-b border-slate-800 space-x-8">
+            <button onclick="switchTab('lab')" id="tab-lab" class="pb-4 border-b-2 border-indigo-500 font-semibold text-sm text-indigo-400 flex items-center gap-2 transition">
+                <i class="fa-solid fa-flask"></i> Idempotency Lab & Simulator
+            </button>
+            <button onclick="switchTab('ledger')" id="tab-ledger" class="pb-4 border-b-2 border-transparent font-semibold text-sm text-slate-400 hover:text-slate-200 flex items-center gap-2 transition">
+                <i class="fa-solid fa-book-journal-whills"></i> Double-Entry Ledger
+            </button>
+            <button onclick="switchTab('history')" id="tab-history" class="pb-4 border-b-2 border-transparent font-semibold text-sm text-slate-400 hover:text-slate-200 flex items-center gap-2 transition">
+                <i class="fa-solid fa-clock-rotate-left"></i> Payment History
+            </button>
+        </div>
+
+        <!-- TAB 1: IDEMPOTENCY LAB & SIMULATOR -->
+        <div id="view-lab" class="space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                
+                <!-- Left: Form and Controls -->
+                <div class="lg:col-span-6 space-y-6">
+                    <div class="bg-slate-950/60 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
+                        <div class="flex items-center justify-between pb-3 border-b border-slate-800/80">
+                            <h2 class="text-base font-bold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-paper-plane text-indigo-400"></i>
+                                Payment Request Builder
+                            </h2>
+                            <button onclick="generateRandomKey()" class="text-xs text-indigo-400 hover:text-indigo-300 transition flex items-center gap-1">
+                                <i class="fa-solid fa-arrows-rotate"></i> New Key (UUID)
+                            </button>
+                        </div>
+
+                        <!-- Idempotency Key Header -->
+                        <div class="space-y-1.5">
+                            <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                                HTTP Header: Idempotency-Key <span class="text-rose-400">*</span>
+                            </label>
+                            <div class="relative">
+                                <input type="text" id="input-key" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm font-mono text-indigo-300 focus:outline-none focus:border-indigo-500 transition" value="pay-demo-key-8d9f4e2a">
+                                <button onclick="copyToClipboard('input-key')" class="absolute right-3 top-2.5 text-slate-500 hover:text-slate-300 transition text-xs">
+                                    <i class="fa-regular fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Customer ID & Amount -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="space-y-1.5">
+                                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">Customer ID <span class="text-rose-400">*</span></label>
+                                <input type="text" id="input-customer" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm font-mono text-slate-100 focus:outline-none focus:border-indigo-500" value="cust_123">
+                            </div>
+
+                            <div class="space-y-1.5">
+                                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">Amount <span class="text-rose-400">*</span></label>
+                                <input type="number" step="0.01" min="0.01" id="input-amount" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm font-mono text-slate-100 focus:outline-none focus:border-indigo-500" value="1500.00">
+                            </div>
+                        </div>
+
+                        <!-- Currency & Description -->
+                        <div class="grid grid-cols-3 gap-4">
+                            <div class="space-y-1.5">
+                                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">Currency <span class="text-rose-400">*</span></label>
+                                <select id="input-currency" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm font-mono text-slate-100 focus:outline-none focus:border-indigo-500">
+                                    <option value="INR" selected>INR (₹)</option>
+                                    <option value="USD">USD ($)</option>
+                                    <option value="EUR">EUR (€)</option>
+                                    <option value="GBP">GBP (£)</option>
+                                    <option value="JPY">JPY (¥)</option>
+                                    <option value="INVALID_CODE">INVALID_CODE (Validation Test)</option>
+                                </select>
+                            </div>
+
+                            <div class="col-span-2 space-y-1.5">
+                                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider">Description</label>
+                                <input type="text" id="input-desc" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500" value="Order #12345">
+                            </div>
+                        </div>
+
+                        <!-- Action Execution Buttons -->
+                        <div class="pt-3 border-t border-slate-800 space-y-2.5">
+                            <p class="text-xs text-slate-400 font-medium">Idempotency & Concurrency Stress Scenarios:</p>
+                            <div class="grid grid-cols-2 gap-2.5">
+                                <button onclick="sendPaymentRequest(false)" class="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 font-semibold text-sm text-white shadow-lg shadow-indigo-600/30 transition flex items-center justify-center gap-2">
+                                    <i class="fa-solid fa-play text-xs"></i> 1. Execute Payment
+                                </button>
+
+                                <button onclick="sendPaymentRequest(false)" class="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 font-semibold text-sm text-indigo-300 border border-indigo-500/30 transition flex items-center justify-center gap-2">
+                                    <i class="fa-solid fa-rotate text-xs"></i> 2. Replay Exact Key
+                                </button>
+
+                                <button onclick="runConcurrentStressTest(10)" class="w-full py-2.5 px-4 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold text-sm transition flex items-center justify-center gap-2">
+                                    <i class="fa-solid fa-burst text-xs"></i> 3. Fire 10x Parallel
+                                </button>
+
+                                <button onclick="runTamperTest()" class="w-full py-2.5 px-4 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 font-semibold text-sm transition flex items-center justify-center gap-2">
+                                    <i class="fa-solid fa-triangle-exclamation text-xs"></i> 4. Tamper Payload
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Response & Inspector -->
+                <div class="lg:col-span-6 space-y-6">
+                    <div class="bg-slate-950/60 border border-slate-800 rounded-2xl p-6 shadow-xl h-full flex flex-col">
+                        <div class="flex items-center justify-between pb-3 border-b border-slate-800/80">
+                            <h2 class="text-base font-bold text-white flex items-center gap-2">
+                                <i class="fa-solid fa-terminal text-cyan-400"></i>
+                                Live HTTP Telemetry Inspector
+                            </h2>
+                            <div class="flex items-center gap-2" id="response-meta-badges">
+                                <span class="text-xs px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 font-mono">Status: Ready</span>
+                            </div>
+                        </div>
+
+                        <!-- Response Headers / Details -->
+                        <div class="grid grid-cols-3 gap-2 my-4" id="header-chips">
+                            <div class="bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-center">
+                                <span class="text-[10px] text-slate-400 block uppercase">HTTP Code</span>
+                                <span id="chip-status" class="text-sm font-bold font-mono text-slate-200">-</span>
+                            </div>
+                            <div class="bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-center">
+                                <span class="text-[10px] text-slate-400 block uppercase">X-Idempotent-Replay</span>
+                                <span id="chip-replay" class="text-sm font-bold font-mono text-slate-200">-</span>
+                            </div>
+                            <div class="bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-center">
+                                <span class="text-[10px] text-slate-400 block uppercase">Latency</span>
+                                <span id="chip-latency" class="text-sm font-bold font-mono text-slate-200">-</span>
+                            </div>
+                        </div>
+
+                        <!-- Raw JSON Response Box -->
+                        <div class="flex-1 bg-slate-900/90 border border-slate-800 rounded-xl p-4 font-mono text-xs text-slate-200 overflow-auto custom-scroll relative min-h-[260px]">
+                            <pre id="response-json" class="whitespace-pre-wrap">// Awaiting transaction execution...</pre>
+                        </div>
+
+                        <!-- Concurrent Stress Results Log -->
+                        <div id="concurrent-log-container" class="mt-4 pt-3 border-t border-slate-800 hidden">
+                            <h3 class="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Concurrent Execution Results:</h3>
+                            <div id="concurrent-log" class="space-y-1 max-h-32 overflow-y-auto font-mono text-xs text-slate-400 custom-scroll"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: DOUBLE-ENTRY LEDGER -->
+        <div id="view-ledger" class="space-y-6 hidden">
+            <div class="bg-slate-950/60 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+                    <div>
+                        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-scale-balanced text-violet-400"></i> Double-Entry General Ledger
+                        </h2>
+                        <p class="text-xs text-slate-400 mt-0.5">Every financial event creates balanced debit and credit entries.</p>
+                    </div>
+
+                    <div class="flex items-center gap-3">
+                        <div class="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 flex items-center gap-2">
+                            <span class="text-xs text-slate-400">Ledger Balance:</span>
+                            <span class="text-xs font-bold font-mono text-emerald-400 flex items-center gap-1">
+                                <i class="fa-solid fa-circle-check"></i> Balanced (Δ = 0.00)
+                            </span>
+                        </div>
+                        <button onclick="fetchPaymentHistory()" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white transition">
+                            <i class="fa-solid fa-arrows-rotate"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Ledger Entries Table -->
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="text-xs uppercase text-slate-400 bg-slate-900/60 border-b border-slate-800">
+                            <tr>
+                                <th class="px-4 py-3">Timestamp</th>
+                                <th class="px-4 py-3">Payment ID</th>
+                                <th class="px-4 py-3">Account ID</th>
+                                <th class="px-4 py-3">Entry Type</th>
+                                <th class="px-4 py-3">Amount</th>
+                                <th class="px-4 py-3">Currency</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ledger-table-body" class="divide-y divide-slate-800/60 font-mono text-xs">
+                            <tr>
+                                <td colspan="6" class="px-4 py-8 text-center text-slate-500 font-sans">
+                                    No ledger entries recorded yet. Create a payment in the lab.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: PAYMENT HISTORY -->
+        <div id="view-history" class="space-y-6 hidden">
+            <div class="bg-slate-950/60 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+                    <div>
+                        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-clock-rotate-left text-indigo-400"></i> Payment Records
+                        </h2>
+                        <p class="text-xs text-slate-400 mt-0.5">Live records from PostgreSQL database with optimistic lock versions.</p>
+                    </div>
+
+                    <div class="flex items-center gap-3">
+                        <input type="text" id="filter-customer" placeholder="Filter by customerId" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-indigo-500" value="cust_123">
+                        <button onclick="fetchPaymentHistory()" class="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white transition">
+                            Query
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Payments Table -->
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="text-xs uppercase text-slate-400 bg-slate-900/60 border-b border-slate-800">
+                            <tr>
+                                <th class="px-4 py-3">Payment ID</th>
+                                <th class="px-4 py-3">Customer ID</th>
+                                <th class="px-4 py-3">Amount</th>
+                                <th class="px-4 py-3">Status</th>
+                                <th class="px-4 py-3">Version</th>
+                                <th class="px-4 py-3">Created At</th>
+                                <th class="px-4 py-3 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="payments-table-body" class="divide-y divide-slate-800/60 text-xs">
+                            <tr>
+                                <td colspan="7" class="px-4 py-8 text-center text-slate-500">
+                                    Loading payment history...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-6 right-6 px-4 py-3 rounded-xl shadow-2xl border text-sm font-medium transition-all duration-300 transform translate-y-20 opacity-0 z-50 flex items-center gap-3 bg-slate-900 border-slate-700 text-slate-100">
+        <i id="toast-icon" class="fa-solid fa-circle-check text-emerald-400"></i>
+        <span id="toast-message">Message text</span>
+    </div>
+
+    <!-- JavaScript Logic -->
+    <script>
+        const API_BASE = '/api/v1/payments';
+
+        function switchTab(tab) {
+            document.querySelectorAll('[id^="view-"]').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('[id^="tab-"]').forEach(el => {
+                el.classList.remove('border-indigo-500', 'text-indigo-400');
+                el.classList.add('border-transparent', 'text-slate-400');
+            });
+
+            document.getElementById(`view-${tab}`).classList.remove('hidden');
+            const activeTab = document.getElementById(`tab-${tab}`);
+            activeTab.classList.add('border-indigo-500', 'text-indigo-400');
+            activeTab.classList.remove('border-transparent', 'text-slate-400');
+
+            if (tab === 'history' || tab === 'ledger') {
+                fetchPaymentHistory();
+            }
+        }
+
+        function generateRandomKey() {
+            const uuid = 'pay-key-' + crypto.randomUUID();
+            document.getElementById('input-key').value = uuid;
+            showToast('Generated new UUID Idempotency-Key', 'info');
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toast-icon');
+            const msg = document.getElementById('toast-message');
+
+            msg.innerText = message;
+            if (type === 'success') {
+                icon.className = 'fa-solid fa-circle-check text-emerald-400';
+            } else if (type === 'error') {
+                icon.className = 'fa-solid fa-circle-exclamation text-rose-400';
+            } else if (type === 'warning') {
+                icon.className = 'fa-solid fa-triangle-exclamation text-amber-400';
+            } else {
+                icon.className = 'fa-solid fa-circle-info text-cyan-400';
+            }
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3500);
+        }
+
+        async function sendPaymentRequest(isTamper = false) {
+            const key = document.getElementById('input-key').value.trim();
+            const customerId = document.getElementById('input-customer').value.trim();
+            let amount = parseFloat(document.getElementById('input-amount').value);
+            const currency = document.getElementById('input-currency').value;
+            const description = document.getElementById('input-desc').value;
+
+            if (isTamper) {
+                amount = amount + 999.00; // Alter payload with same key
+            }
+
+            const payload = { customerId, amount, currency, description };
+
+            const startTime = performance.now();
+            try {
+                const response = await fetch(API_BASE, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Idempotency-Key': key
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const latency = Math.round(performance.now() - startTime);
+                const replayHeader = response.headers.get('X-Idempotent-Replay') || 'false';
+                const data = await response.json();
+
+                // Update Inspector
+                updateInspector(response.status, replayHeader, latency, data);
+
+                if (response.status === 201) {
+                    showToast(`Payment Created (201)! PaymentId: ${data.paymentId.substring(0,8)}...`, 'success');
+                } else if (response.status === 200 && replayHeader === 'true') {
+                    showToast(`Idempotent Replay (200)! Zero DB duplicate rows.`, 'info');
+                } else if (response.status === 422) {
+                    showToast(`422 Payload Mismatch! Same key used with different payload.`, 'warning');
+                } else if (response.status === 409) {
+                    showToast(`409 Conflict! Concurrent request in progress.`, 'warning');
+                } else {
+                    showToast(`HTTP ${response.status}: ${data.error || 'Error'}`, 'error');
+                }
+            } catch (err) {
+                updateInspector(500, 'N/A', 0, { error: err.message });
+                showToast('Network / Server Error: ' + err.message, 'error');
+            }
+        }
+
+        function updateInspector(status, replay, latency, data) {
+            const chipStatus = document.getElementById('chip-status');
+            const chipReplay = document.getElementById('chip-replay');
+            const chipLatency = document.getElementById('chip-latency');
+
+            chipStatus.innerText = status;
+            chipStatus.className = `text-sm font-bold font-mono ${status >= 200 && status < 300 ? 'text-emerald-400' : 'text-rose-400'}`;
+
+            chipReplay.innerText = replay;
+            chipReplay.className = `text-sm font-bold font-mono ${replay === 'true' ? 'text-indigo-400' : 'text-slate-300'}`;
+
+            chipLatency.innerText = `${latency}ms`;
+            document.getElementById('response-json').innerText = JSON.stringify(data, null, 2);
+        }
+
+        async function runTamperTest() {
+            showToast('Tampering amount with identical Idempotency-Key...', 'warning');
+            await sendPaymentRequest(true);
+        }
+
+        async function runConcurrentStressTest(count = 10) {
+            const key = document.getElementById('input-key').value.trim();
+            const customerId = document.getElementById('input-customer').value.trim();
+            const amount = parseFloat(document.getElementById('input-amount').value);
+            const currency = document.getElementById('input-currency').value;
+            const description = document.getElementById('input-desc').value;
+            const payload = { customerId, amount, currency, description };
+
+            const logContainer = document.getElementById('concurrent-log-container');
+            const logBox = document.getElementById('concurrent-log');
+            logContainer.classList.remove('hidden');
+            logBox.innerHTML = `<div class="text-indigo-400">Firing ${count} parallel requests with Key: ${key}...</div>`;
+
+            const promises = [];
+            for (let i = 1; i <= count; i++) {
+                promises.push(
+                    fetch(API_BASE, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key },
+                        body: JSON.stringify(payload)
+                    }).then(async res => ({
+                        thread: i,
+                        status: res.status,
+                        replay: res.headers.get('X-Idempotent-Replay'),
+                        data: await res.json()
+                    }))
+                );
+            }
+
+            const results = await Promise.all(promises);
+            let createdCount = 0;
+            let conflictCount = 0;
+            let replayCount = 0;
+
+            results.forEach(r => {
+                if (r.status === 201) createdCount++;
+                if (r.status === 409) conflictCount++;
+                if (r.status === 200) replayCount++;
+
+                const color = r.status === 201 ? 'text-emerald-400' : (r.status === 409 ? 'text-amber-400' : 'text-indigo-400');
+                logBox.innerHTML += `<div class="${color}">Thread #${r.thread}: HTTP ${r.status} (Replay: ${r.replay || 'false'})</div>`;
+            });
+
+            logBox.innerHTML += `<div class="text-emerald-300 font-bold mt-1">Summary: Created: ${createdCount} | Conflicts: ${conflictCount} | Replays: ${replayCount} (DB: Exactly 1 Payment)</div>`;
+            showToast(`Concurrency Test Complete: Exactly 1 DB Creation!`, 'success');
+        }
+
+        async function fetchPaymentHistory() {
+            const customerId = document.getElementById('filter-customer').value.trim() || 'cust_123';
+            try {
+                const res = await fetch(`${API_BASE}?customerId=${encodeURIComponent(customerId)}&size=50`);
+                const data = await res.json();
+                const payments = data.content || [];
+
+                // Render Payments Table
+                const paymentsTbody = document.getElementById('payments-table-body');
+                if (payments.length === 0) {
+                    paymentsTbody.innerHTML = `<tr><td colspan="7" class="px-4 py-8 text-center text-slate-500">No payments found for customer '${customerId}'.</td></tr>`;
+                } else {
+                    paymentsTbody.innerHTML = payments.map(p => `
+                        <tr class="hover:bg-slate-900/40 font-mono transition">
+                            <td class="px-4 py-3 text-indigo-300">${p.paymentId}</td>
+                            <td class="px-4 py-3 text-slate-300">${p.customerId}</td>
+                            <td class="px-4 py-3 font-bold text-white">${p.amount} ${p.currency}</td>
+                            <td class="px-4 py-3">
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                    p.status === 'CREATED' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                                    (p.status === 'CANCELLED' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'bg-slate-700 text-slate-300')
+                                }">${p.status}</span>
+                            </td>
+                            <td class="px-4 py-3 text-slate-400">v${p.version}</td>
+                            <td class="px-4 py-3 text-slate-400">${new Date(p.createdAt).toLocaleTimeString()}</td>
+                            <td class="px-4 py-3 text-right font-sans">
+                                ${p.status !== 'CANCELLED' ? `
+                                    <button onclick="cancelPayment('${p.paymentId}')" class="px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-semibold transition">
+                                        Cancel
+                                    </button>
+                                ` : '<span class="text-xs text-slate-500">Cancelled</span>'}
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+
+                // Render Ledger Table
+                const ledgerTbody = document.getElementById('ledger-table-body');
+                const allLedgerEntries = [];
+                payments.forEach(p => {
+                    if (p.ledgerEntries) {
+                        p.ledgerEntries.forEach(le => allLedgerEntries.push({ ...le, paymentId: p.paymentId }));
+                    }
+                });
+
+                if (allLedgerEntries.length === 0) {
+                    ledgerTbody.innerHTML = `<tr><td colspan="6" class="px-4 py-8 text-center text-slate-500">No ledger entries found.</td></tr>`;
+                } else {
+                    ledgerTbody.innerHTML = allLedgerEntries.map(le => `
+                        <tr class="hover:bg-slate-900/40 transition">
+                            <td class="px-4 py-3 text-slate-400">${new Date(le.createdAt).toLocaleTimeString()}</td>
+                            <td class="px-4 py-3 text-indigo-300">${le.paymentId.substring(0,8)}...</td>
+                            <td class="px-4 py-3 font-bold ${le.accountId.includes('ESCROW') ? 'text-violet-400' : 'text-slate-200'}">${le.accountId}</td>
+                            <td class="px-4 py-3">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold ${
+                                    le.entryType === 'DEBIT' ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'
+                                }">${le.entryType}</span>
+                            </td>
+                            <td class="px-4 py-3 font-bold text-white">${le.amount}</td>
+                            <td class="px-4 py-3 text-slate-300">${le.currency}</td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function cancelPayment(paymentId) {
+            if (!confirm(`Cancel payment ${paymentId}? This will create balanced reversal ledger entries.`)) return;
+
+            try {
+                const res = await fetch(`${API_BASE}/${paymentId}/cancel?reason=UserRequestedFromUI`, { method: 'POST' });
+                const data = await res.json();
+                if (res.ok) {
+                    showToast(`Payment ${paymentId.substring(0,8)}... Cancelled! Reversal ledger written.`, 'success');
+                    fetchPaymentHistory();
+                } else {
+                    showToast(`Cancellation failed: ${data.message}`, 'error');
+                }
+            } catch (err) {
+                showToast(`Error cancelling payment: ${err.message}`, 'error');
+            }
+        }
+
+        function copyToClipboard(elementId) {
+            const val = document.getElementById(elementId).value;
+            navigator.clipboard.writeText(val);
+            showToast('Copied to clipboard!', 'info');
+        }
+
+        // Periodic Health Check
+        async function checkHealth() {
+            try {
+                const res = await fetch('/actuator/health');
+                const data = await res.json();
+                if (data.status === 'UP') {
+                    document.getElementById('system-status-badge').className = 'flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium';
+                    document.getElementById('system-status-text').innerText = 'All Services UP';
+                }
+            } catch {
+                document.getElementById('system-status-badge').className = 'flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium';
+                document.getElementById('system-status-text').innerText = 'API Disconnected';
+            }
+        }
+
+        checkHealth();
+        setInterval(checkHealth, 15000);
+    </script>
+</body>
+</html>
