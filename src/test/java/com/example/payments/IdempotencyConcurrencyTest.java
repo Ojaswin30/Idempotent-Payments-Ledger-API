@@ -6,6 +6,7 @@ import com.example.payments.entity.Payment;
 import com.example.payments.repository.PaymentRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.http.HttpEntity;
@@ -68,7 +69,7 @@ class IdempotencyConcurrencyTest extends AbstractIntegrationTest {
             executor.submit(() -> {
                 readyLatch.countDown();
                 try {
-                    startLatch.await(); // wait for all threads to be ready
+                    startLatch.await(); // release all threads at once
 
                     ResponseEntity<PaymentResponse> response = restTemplate.exchange(
                             "/api/v1/payments",
@@ -91,7 +92,7 @@ class IdempotencyConcurrencyTest extends AbstractIntegrationTest {
                         conflictCount.incrementAndGet();
                     }
                 } catch (Exception e) {
-                    // Log or record any client-level exceptions
+                    // Log error if any
                 } finally {
                     doneLatch.countDown();
                 }
@@ -99,22 +100,15 @@ class IdempotencyConcurrencyTest extends AbstractIntegrationTest {
         }
 
         readyLatch.await(10, TimeUnit.SECONDS);
-        startLatch.countDown(); // Release all threads at the exact same millisecond
+        startLatch.countDown();
         boolean finished = doneLatch.await(30, TimeUnit.SECONDS);
         executor.shutdown();
 
         assertThat(finished).isTrue();
-
-        // Exactly 1 thread must have succeeded in initiating the payment creation (201 Created)
         assertThat(createdCount.get()).isEqualTo(1);
-
-        // All successful responses (201 or 200 replay) must reference the exact same payment ID
         assertThat(createdPaymentIds).hasSize(1);
-
-        // Total requests handled = created + conflicts + cached replays
         assertThat(createdCount.get() + conflictCount.get() + cachedReplayCount.get()).isEqualTo(numberOfThreads);
 
-        // Verify in Database: Exactly 1 payment record exists for this customer with this amount
         List<Payment> dbPayments = paymentRepository.findAll().stream()
                 .filter(p -> "cust_concurrent_999".equals(p.getCustomerId()))
                 .toList();
