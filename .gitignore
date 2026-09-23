@@ -1,0 +1,129 @@
+# ==============================================================================
+# Java & Maven Build Artifacts
+# ==============================================================================
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# Bytecode & Archives
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+*.zip
+*.tar.gz
+*.rar
+
+# JVM crash logs and heap dumps
+hs_err_pid*
+replay_pid*
+*.hprof
+
+# ==============================================================================
+# IDE & Editor Files
+# ==============================================================================
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+.idea_modules/
+
+# Eclipse / Spring Tool Suite (STS)
+.apt_generated/
+.apt_generated_tests/
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache/
+
+# Visual Studio Code
+.vscode/
+.vscode-test/
+*.code-workspace
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbproject/load-resource-prefixes.xml
+
+# ==============================================================================
+# Logs & Testing Output
+# ==============================================================================
+*.log
+logs/
+*.dump
+*.dumpstream
+
+# ==============================================================================
+# Environment, Credentials & Local Configs
+# ==============================================================================
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+*.crt
+
+# Testcontainers local machine overrides
+.testcontainers.properties
+
+# Docker Compose local overrides & volumes
+docker-compose.override.yml
+postgres_data/
+redis_data/
+kafka_data/
+
+# ==============================================================================
+# Operating System Files
+# ==============================================================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+
+# ==============================================================================
+# Temporary & Swap Files
+# ==============================================================================
+tmp/
+temp/
+.cache/
+*.swp
+*.swo
+*.bak
