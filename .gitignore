@@ -55,11 +55,12 @@ out/
 .vscode-test/
 *.code-workspace
 
-# NetBeans
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbproject/load-resource-prefixes.xml
+# Node & Frontend Build Artifacts
+node_modules/
+dist/
+.vite/
+.eslintcache
+
 
 # ==============================================================================
 # Logs & Testing Output

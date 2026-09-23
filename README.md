@@ -1,52 +1,59 @@
-# Production-Grade Idempotent Payments Ledger API
+# Production-Grade Idempotent Payments Ledger API & NovaStore
 
 [![Java 17+](https://img.shields.io/badge/Java-17%2B-blue.svg)](https://openjdk.org/)
 [![Spring Boot 3.3.4](https://img.shields.io/badge/Spring%20Boot-3.3.4-brightgreen.svg)](https://spring.io/projects/spring-boot)
+[![React 18](https://img.shields.io/badge/React-18-61dafb.svg)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue.svg)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-5.4-purple.svg)](https://vitejs.dev/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38bdf8.svg)](https://tailwindcss.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
 [![Redis](https://img.shields.io/badge/Redis-7-red.svg)](https://redis.io/)
 [![Apache Kafka](https://img.shields.io/badge/Apache%20Kafka-3.x-black.svg)](https://kafka.apache.org/)
 [![Testcontainers](https://img.shields.io/badge/Testcontainers-1.20-orange.svg)](https://www.testcontainers.org/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-A production-grade, distributed financial transaction system engineered to guarantee **strict idempotency**, **transactional consistency**, and **eventual consistency** under high concurrency and failure scenarios. Built with **Spring Boot 3**, **PostgreSQL**, **Redis**, **Apache Kafka**, **OpenTelemetry**, and **Testcontainers**.
+A production-grade, distributed financial transaction system engineered to guarantee **strict idempotency**, **transactional consistency**, and **eventual consistency** under high concurrency and failure scenarios. Includes an e-commerce storefront (**NovaStore** in React + TypeScript) and an interactive **Developer Testing Lab & Ledger Inspector**.
 
 ---
 
 ## Table of Contents
 
-1. [Problem Statement](#1-problem-statement)
-2. [High-Level Architecture](#2-high-level-architecture)
+1. [Problem Statement & Motivation](#1-problem-statement--motivation)
+2. [Target Architecture](#2-target-architecture)
 3. [Technology Stack](#3-technology-stack)
-4. [Distributed Idempotency Layer](#4-distributed-idempotency-layer)
-5. [Double-Entry Financial Ledger](#5-double-entry-financial-ledger)
+4. [Distributed Idempotency Layer Deep Dive](#4-distributed-idempotency-layer-deep-dive)
+5. [Double-Entry Financial Bookkeeping & Ledger](#5-double-entry-financial-bookkeeping--ledger)
 6. [Transactional Outbox Pattern & Kafka Event Streaming](#6-transactional-outbox-pattern--kafka-event-streaming)
-7. [Failure Scenarios & Self-Healing Resiliency](#7-failure-scenarios--self-healing-resiliency)
-8. [Observability, Metrics & Structured Logging](#8-observability-metrics--structured-logging)
-9. [Database Schema & Flyway Migrations](#9-database-schema--flyway-migrations)
-10. [REST API Documentation & cURL Snippets](#10-rest-api-documentation--curl-snippets)
-11. [Testing & Concurrency Verification](#11-testing--concurrency-verification)
-12. [How to Run (Docker & Local)](#12-how-to-run-docker--local)
-13. [Architectural Trade-offs & Deep Dive](#13-architectural-trade-offs--deep-dive)
+7. [User Interfaces: Storefront vs. Developer Lab](#7-user-interfaces-storefront-vs-developer-lab)
+8. [Failure Scenarios & Self-Healing Resiliency](#8-failure-scenarios--self-healing-resiliency)
+9. [Observability, Metrics & Structured Logging](#9-observability-metrics--structured-logging)
+10. [Database Schema & Flyway Migrations](#10-database-schema--flyway-migrations)
+11. [REST API Documentation & cURL Snippets](#11-rest-api-documentation--curl-snippets)
+12. [Testing & Concurrency Verification](#12-testing--concurrency-verification)
+13. [How to Run (Docker, Local & Frontend)](#13-how-to-run-docker-local--frontend)
+14. [Architectural Trade-offs & Engineering Decisions](#14-architectural-trade-offs--engineering-decisions)
 
 ---
 
-## 1. Problem Statement
+## 1. Problem Statement & Motivation
 
-In distributed financial systems and payment gateways, network failures, timeouts, and client retries are inevitable. A naive REST implementation suffers from severe risks:
-1. **Duplicate Charging**: A client sends `POST /payments`, the database commits the payment, but network drops before the HTTP response reaches the client. The client retries the request, leading to double-charging.
-2. **Race Conditions / Concurrent Submissions**: Fast-clicking users or parallel microservices fire simultaneous requests with the same transaction intent, causing concurrent write races.
-3. **Dual-Write Inconsistency (DB vs Broker)**: Updating the database and publishing to Kafka in separate steps leaves a consistency gap if Kafka is temporarily unavailable or if the application crashes mid-process.
-4. **Unbalanced Financial State**: Storing single-table balance mutations without an immutable double-entry audit trail makes financial reconciliation impossible.
+In distributed payment networks, network drops, client retries, and race conditions are everyday realities. A naive REST implementation exposes systems to critical failure modes:
 
-This system solves all four problems through **Redis-backed atomic distributed locking**, **SHA-256 payload fingerprinting**, **strict double-entry bookkeeping**, and a **Transactional Outbox with `SELECT ... FOR UPDATE SKIP LOCKED` and exponential backoff DLQ routing**.
+1. **Duplicate Charging**: A client sends `POST /payments`, the database commits the transaction, but the mobile network disconnects before the HTTP response arrives. The client retries, causing the customer to be double-charged.
+2. **Concurrent Request Races**: Rapid double-clicking on checkout buttons sends identical requests simultaneously, racing to write duplicate rows.
+3. **Dual-Write Inconsistency (DB vs Broker)**: Saving to PostgreSQL and publishing to Kafka in separate steps causes lost events if the message broker is temporarily unreachable or the app crashes.
+4. **Unbalanced Financial Ledger**: Mutating a mutable `balance` column without an immutable double-entry ledger makes reconciliation and audit tracking impossible.
+
+This system solves all four challenges through **atomic Redis distributed locking**, **SHA-256 request fingerprinting**, **balanced double-entry accounting**, and a **Transactional Outbox with `SELECT ... FOR UPDATE SKIP LOCKED` and exponential backoff DLQ routing**.
 
 ---
 
-## 2. High-Level Architecture
+## 2. Target Architecture
 
 ```
                     ┌────────────────────────┐
-                    │      API Client        │
+                    │    NovaStore Client    │
+                    │  (React 18 Storefront) │
                     └───────────┬────────────┘
                                 │
                                 │ POST /api/v1/payments
@@ -98,29 +105,32 @@ This system solves all four problems through **Redis-backed atomic distributed l
 
 ## 3. Technology Stack
 
+### Backend & Infrastructure
 | Component | Technology | Version | Purpose |
 |---|---|---|---|
-| **Framework** | Spring Boot | 3.3.4 | Core framework, dependency injection, MVC |
+| **Framework** | Spring Boot | 3.3.4 | REST MVC, Transaction Management, Dependency Injection |
 | **Language** | Java | 17 / 21 | Modern records, pattern matching, typed concurrency |
-| **Primary Database** | PostgreSQL | 16 | ACID financial transactions, JSONB outbox |
-| **Distributed Cache** | Redis | 7.x | Atomic `SETNX` locking, cached response replay |
-| **Message Broker** | Apache Kafka | 3.x | Asynchronous event distribution & DLQ streaming |
-| **Database Migrations**| Flyway | 10.x | Version-controlled database schema migrations |
-| **Observability** | OpenTelemetry / Micrometer | Latest | Distributed W3C tracing, metrics, custom gauges |
-| **Structured Logging** | Logstash Logback Encoder| 7.4 | Formatted JSON logs with MDC TraceId / SpanId |
-| **API Docs** | Springdoc OpenAPI / Swagger | 2.6.0 | Interactive OpenAPI 3.0 specification |
-| **Testing** | JUnit 5 + Testcontainers | 1.20.1 | Ephemeral containerized integration & concurrency tests |
+| **Database** | PostgreSQL | 16 | ACID financial transactions, JSONB outbox events |
+| **Cache / Lock** | Redis | 7.x | Atomic `SETNX` locking, 24h cached replay |
+| **Message Broker** | Apache Kafka | 3.x (KRaft) | Asynchronous event publishing & DLQ routing |
+| **Migrations** | Flyway | 10.x | Versioned database schema migrations (`V1` - `V4`) |
+| **Tracing** | OpenTelemetry / Brave | Latest | W3C distributed trace context propagation |
+| **Logging** | Logstash Logback | 7.4 | Structured JSON logging with trace/span metadata |
+| **API Docs** | Springdoc OpenAPI | 2.6.0 | OpenAPI 3.0 specification & Swagger UI |
+| **Testing** | Testcontainers | 1.20.1 | Ephemeral containerized integration & concurrency tests |
+
+### Frontend Applications
+| Application | Tech Stack | Role | URL |
+|---|---|---|---|
+| **NovaStore Storefront** | React 18, TypeScript, Vite, Tailwind CSS, Lucide | Consumer Checkout App | `http://localhost:5173` |
+| **Dev Testing Lab** | Vanilla HTML5 / JS, Tailwind CSS, FontAwesome | Engineering & Ledger Inspector | `http://localhost:8080` |
 
 ---
 
-## 4. Distributed Idempotency Layer
-
-### The Mechanics
-
-When a client calls `POST /api/v1/payments`, it **must** provide a unique `Idempotency-Key` header (e.g. UUID).
+## 4. Distributed Idempotency Layer Deep Dive
 
 ```
-Client Request
+Client Request (POST /api/v1/payments with Header: Idempotency-Key)
       │
       ▼
 Compute SHA-256 Hash of Payload (customerId + amount + currency + description)
@@ -140,124 +150,122 @@ Redis SET idempotency:payments:{key} {status: IN_PROGRESS} NX EX 30s
                └── Status == COMPLETED?   ────────> Return Cached Response (200 OK, X-Idempotent-Replay: true)
 ```
 
-### Key Design Pillars
-
+### Key Design Highlights:
 1. **Short `IN_PROGRESS` TTL (30 seconds)**:
-   - Prevents permanent lockouts if an application node abruptly crashes mid-transaction.
-   - If a crash occurs, the key naturally expires after 30s, allowing safe client retries.
-2. **Long `COMPLETED` TTL (24 hours / 86400 seconds)**:
-   - Once committed, subsequent retries receive the exact cached response instantaneously without touching PostgreSQL.
-3. **Payload Fingerprint Verification**:
-   - Computes a deterministic SHA-256 hash of `customerId|amount|currency|description`.
-   - Reusing the same idempotency key for a different payment payload throws `IdempotencyPayloadMismatchException` (`422 Unprocessable Entity`).
+   - If an application node crashes mid-transaction, the key automatically expires after 30s, allowing client retries without manual admin intervention.
+2. **Long `COMPLETED` TTL (24 hours)**:
+   - Subsequent retries receive the original `PaymentResponse` instantly with `X-Idempotent-Replay: true` and 0 database writes.
+3. **SHA-256 Payload Fingerprinting**:
+   - Reusing an existing key with altered parameters (e.g. changing the amount) throws `IdempotencyPayloadMismatchException` (`422 Unprocessable Entity`).
 
 ---
 
-## 5. Double-Entry Financial Ledger
+## 5. Double-Entry Financial Bookkeeping & Ledger
 
-In accordance with strict accounting principles, money is never created or destroyed; every financial event produces balanced debit and credit entries.
+Money is never created or destroyed; every payment and cancellation records balanced debit and credit entries.
 
-### Ledger Operations
+### Ledger Structure
+- **Payment Creation (`POST /payments`)**:
+  - `DEBIT` `cust_123` (₹1500.00 INR)
+  - `CREDIT` `SYSTEM_ESCROW_ACCOUNT` (₹1500.00 INR)
+  $$\sum \text{Debits} = \sum \text{Credits} = 1500.00 \text{ INR} \quad (\Delta = 0.00)$$
 
-#### 1. Payment Creation (`POST /payments`)
-For a payment of `1500.00 INR` from customer `cust_123`:
-| Account ID | Entry Type | Amount | Currency | Description |
-|---|---|---|---|---|
-| `cust_123` | **DEBIT** | `1500.00` | `INR` | Customer account deducted |
-| `SYSTEM_ESCROW_ACCOUNT` | **CREDIT** | `1500.00` | `INR` | Held in clearing / escrow |
-
-$$\sum \text{Debits} = \sum \text{Credits} = 1500.00 \text{ INR}$$
-
-#### 2. Payment Cancellation (`POST /payments/{id}/cancel`)
-Reverses the initial transaction with inverse entries:
-| Account ID | Entry Type | Amount | Currency | Description |
-|---|---|---|---|---|
-| `cust_123` | **CREDIT** | `1500.00` | `INR` | Customer account refunded |
-| `SYSTEM_ESCROW_ACCOUNT` | **DEBIT** | `1500.00` | `INR` | Released from escrow |
+- **Payment Cancellation (`POST /payments/{id}/cancel`)**:
+  - `CREDIT` `cust_123` (₹1500.00 INR)
+  - `DEBIT` `SYSTEM_ESCROW_ACCOUNT` (₹1500.00 INR)
 
 ### Optimistic Locking (`@Version`)
-
-The `Payment` entity carries an `@Version private Long version;` field. Concurrent modification attempts on payment status trigger Spring's `ObjectOptimisticLockingFailureException`, which the global handler translates into a clean `409 Conflict`.
+The `Payment` entity carries `@Version private Long version;`. Concurrent cancellation attempts trigger `ObjectOptimisticLockingFailureException`, translated to `409 Conflict`.
 
 ---
 
 ## 6. Transactional Outbox Pattern & Kafka Event Streaming
 
-### The Consistency Gap
+### The Consistency Guarantee
+In a single atomic PostgreSQL transaction:
+1. `Payment` is persisted.
+2. `LedgerEntry` records are persisted.
+3. `OutboxEvent` (containing JSONB payload of `PaymentCreatedEvent`) is staged with `status = 'PENDING'`.
 
-A standard two-phase commit across PostgreSQL and Kafka is slow and error-prone:
+### The Outbox Worker Job
+```sql
+SELECT * FROM outbox_events
+WHERE status = 'PENDING'
+  AND (next_retry_at IS NULL OR next_retry_at <= :now)
+ORDER BY created_at ASC
+LIMIT :limit
+FOR UPDATE SKIP LOCKED;
 ```
-saveToDatabase();    // Succeeded
-publishToKafka();    // Broker unreachable / Network timeout -> Inconsistent state!
-```
-
-### The Solution: Transactional Outbox
-
-1. **Atomic Enqueue**: Within the **same PostgreSQL transaction** as the `Payment` and `LedgerEntry` writes, we persist a row into `outbox_events`:
-   ```sql
-   INSERT INTO outbox_events (id, aggregate_id, event_type, payload, status, created_at)
-   VALUES ('...', '...', 'PAYMENT_CREATED', '{"amount": 1500.00, ...}', 'PENDING', NOW());
-   ```
-2. **Outbox Worker with `SKIP LOCKED`**:
-   A scheduled worker queries pending events using:
-   ```sql
-   SELECT * FROM outbox_events
-   WHERE status = 'PENDING'
-     AND (next_retry_at IS NULL OR next_retry_at <= :now)
-   ORDER BY created_at ASC
-   LIMIT :limit
-   FOR UPDATE SKIP LOCKED;
-   ```
-   > **Why `SKIP LOCKED`?** Multiple application instances can poll the outbox simultaneously without lock contention or duplicate event processing. Each instance claims exclusive ownership of distinct batches.
-
-3. **Exponential Backoff & Dead-Letter Queue (DLQ)**:
-   - On publish failure, `retry_count` is incremented and `next_retry_at` is scheduled using exponential backoff:
-     $$\text{delay} = \text{baseBackoffMs} \times 2^{(\text{retryCount} - 1)}$$
-   - Once retries reach `max-retries` (default: 5), the event is marked `FAILED` and routed to the Kafka Dead Letter Queue topic (`payments.events.dlq`).
+- **`SKIP LOCKED`**: Multiple worker nodes process distinct outbox batches concurrently with zero row lock contention.
+- **Exponential Retry Backoff**: On broker failure, delays next attempt by:
+  $$\text{delay} = \text{baseBackoffMs} \times 2^{(\text{retryCount} - 1)}$$
+- **Dead-Letter Queue (DLQ)**: When `retry_count >= 5`, the event is marked `FAILED` and routed to `payments.events.dlq`.
 
 ---
 
-## 7. Failure Scenarios & Self-Healing Resiliency
+## 7. User Interfaces: Storefront vs. Developer Lab
 
-| Failure Scenario | System Behavior & Self-Healing Mechanism |
+### 1. NovaStore E-Commerce Storefront (`frontend/`)
+A consumer-facing storefront built with **React 18, TypeScript, and Vite**:
+- **Product Catalog & Cart**: Dynamic quantity updates, 18% GST tax calculation, slide-over cart drawer.
+- **Client-Side Idempotency**: Automatically creates and manages UUID `Idempotency-Key` headers on checkout.
+- **Flaky Network / Double-Click Simulator**: An educational toggle directly in checkout that rapidly fires concurrent requests to visually prove that duplicate clicks never double-charge.
+- **Order Receipts & Tracking**: Shows payment status, unique payment IDs, and ledger breakdown.
+- **My Orders & Instant Refund**: View past orders and trigger one-click cancellation with ledger reversals.
+
+```bash
+cd frontend
+npm install
+npm run dev
+# Open http://localhost:5173
+```
+
+### 2. Developer Testing Lab & Ledger Inspector
+Embedded directly in Spring Boot at **`http://localhost:8080/index.html`**:
+- Manual `Idempotency-Key` customization and payload testing.
+- **10x Concurrent Multi-Thread Stress Fire**: Verifies Redis atomic SETNX under load.
+- **Live Double-Entry General Ledger Table**: Inspects real-time debit/credit rows and balance metrics.
+- **Raw HTTP Telemetry Inspector**: Displays response codes, latencies, and headers.
+
+---
+
+## 8. Failure Scenarios & Self-Healing Resiliency
+
+| Failure Scenario | System Handling & Resiliency Mechanism |
 |---|---|
-| **App node crashes mid-transaction** | The Redis key is held in `IN_PROGRESS` state with a short 30-second TTL. Once expired, client retries are permitted and processed cleanly. |
-| **Kafka broker is offline** | The PostgreSQL transaction succeeds normally. Outbox worker retries with exponential backoff ($1\text{s} \to 2\text{s} \to 4\text{s} \to 8\text{s} \to 16\text{s}$). Once Kafka recovers, events are published without data loss. |
-| **Client network drops before receiving HTTP response** | Client retries `POST /payments` with the original `Idempotency-Key`. Redis returns the cached `PaymentResponse` (`200 OK`, `X-Idempotent-Replay: true`) with 0 database writes. |
-| **100 concurrent requests with identical Idempotency-Key** | Atomic Redis `SETNX` allows exactly 1 thread to acquire the lock (`201 Created`). 99 threads receive `409 Conflict` (during execution) or cached `200 OK` (after completion). |
-| **Client reuses Idempotency-Key with different amount** | SHA-256 payload hash verification detects the mismatch and rejects the request with `422 Unprocessable Entity` (`IDEMPOTENCY_PAYLOAD_MISMATCH`). |
+| **App node crashes mid-transaction** | Redis `IN_PROGRESS` key expires automatically after 30 seconds, allowing client retries to proceed. |
+| **Kafka broker is offline** | PostgreSQL transaction succeeds. Outbox worker retries with exponential backoff ($1\text{s} \to 2\text{s} \to 4\text{s} \to 8\text{s} \to 16\text{s}$). Once Kafka recovers, all events are published in order. |
+| **Client network drops after DB commit** | Client retries with the original `Idempotency-Key`. Redis returns the cached `PaymentResponse` (`200 OK`, `X-Idempotent-Replay: true`) with 0 database writes. |
+| **100 concurrent requests with same key** | Redis `SETNX` permits exactly 1 thread (`201 Created`). 99 threads receive `409 Conflict` (during execution) or cached `200 OK` (after completion). |
+| **Key reused with different amount** | SHA-256 fingerprint mismatch triggers `422 Unprocessable Entity` (`IDEMPOTENCY_PAYLOAD_MISMATCH`). |
 
 ---
 
-## 8. Observability, Metrics & Structured Logging
+## 9. Observability, Metrics & Structured Logging
 
-### Distributed Tracing (OpenTelemetry / Brave)
-- Every incoming HTTP request is tagged with a W3C-compliant `TraceId` and `SpanId`.
-- The TraceId propagates through database queries, Redis calls, outbox workers, Kafka message headers, and error responses.
+### Distributed Tracing (W3C Standard)
+Every request is assigned a `TraceId` and `SpanId`, propagated across HTTP headers, database queries, Redis calls, Kafka event headers, and error responses.
 
-### Structured JSON Logging
-Logback is configured with Logstash JSON formatting:
+### Structured JSON Logs (Logstash Encoder)
 ```json
 {
   "@timestamp": "2026-09-23T10:30:00.123Z",
-  "@version": "1",
   "message": "Payment created successfully with paymentId=7c2d1b82-8491-4e94-81d0-9dfa5dbb7e88, amount=1500.00 INR",
   "logger_name": "com.example.payments.service.PaymentService",
-  "thread_name": "http-nio-8080-exec-1",
   "level": "INFO",
   "traceId": "c5f87b8d4e9c1a01",
   "spanId": "e1f98a2d3b4c5e6f"
 }
 ```
 
-### Custom Actuator Metrics & Prometheus Gauges
-- `payments.outbox.pending.count`: Gauge tracking current backlog of pending outbox events.
-- `payments.outbox.failed.count`: Gauge tracking failed outbox events routed to DLQ.
-- `/actuator/health`: Deep health checks covering PostgreSQL, Redis, and Kafka.
+### Actuator Metrics & Prometheus Endpoints
+- `payments.outbox.pending.count`: Gauge tracking pending outbox backlog.
+- `payments.outbox.failed.count`: Gauge tracking failed DLQ events.
+- `/actuator/health`: Health status covering PostgreSQL, Redis, and Kafka.
 
 ---
 
-## 9. Database Schema & Flyway Migrations
+## 10. Database Schema & Flyway Migrations
 
 ```
 src/main/resources/db/migration/
@@ -268,7 +276,7 @@ src/main/resources/db/migration/
 ```
 
 ```sql
--- V1: Payments Table
+-- Payments Table
 CREATE TABLE payments (
     id UUID PRIMARY KEY,
     customer_id VARCHAR(100) NOT NULL,
@@ -281,7 +289,7 @@ CREATE TABLE payments (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
 
--- V2: Double-Entry Ledger Entries
+-- Double-Entry Ledger Entries
 CREATE TABLE ledger_entries (
     id UUID PRIMARY KEY,
     payment_id UUID NOT NULL REFERENCES payments(id) ON DELETE CASCADE,
@@ -292,7 +300,7 @@ CREATE TABLE ledger_entries (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
 
--- V3: Transactional Outbox Events
+-- Transactional Outbox Events
 CREATE TABLE outbox_events (
     id UUID PRIMARY KEY,
     aggregate_id UUID NOT NULL,
@@ -306,7 +314,7 @@ CREATE TABLE outbox_events (
     published_at TIMESTAMP WITH TIME ZONE
 );
 
--- V4: Performance Indexes
+-- Performance Indexes
 CREATE INDEX idx_payments_customer_id ON payments (customer_id);
 CREATE INDEX idx_payments_created_at ON payments (created_at DESC);
 CREATE INDEX idx_ledger_payment_id ON ledger_entries (payment_id);
@@ -316,7 +324,7 @@ CREATE INDEX idx_outbox_pending_polling ON outbox_events (created_at ASC) WHERE 
 
 ---
 
-## 10. REST API Documentation & cURL Snippets
+## 11. REST API Documentation & cURL Snippets
 
 ### 1. Create Payment (Idempotent)
 ```bash
@@ -387,70 +395,61 @@ curl -i -X POST "http://localhost:8080/api/v1/payments/7c2d1b82-8491-4e94-81d0-9
 
 ---
 
-## 11. Testing & Concurrency Verification
-
-The suite includes **Unit Tests**, **Integration Tests**, and **Multithreaded Concurrency Stress Tests** powered by **Testcontainers** (spinning up isolated PostgreSQL, Redis, and Kafka containers).
+## 12. Testing & Concurrency Verification
 
 ```bash
-# Run all unit tests
+# Run unit tests
 mvn test "-Dtest=CurrencyValidatorTest,IdempotencyServiceTest,PaymentServiceTest"
 
-# Run entire integration test suite with Testcontainers
+# Run integration & concurrency tests (requires Testcontainers / Docker)
 mvn test
 ```
 
 ### Verified Test Matrix
 
-| Test Suite | Scenario Verified | Result |
+| Test Suite | Scenario Verified | Status |
 |---|---|---|
-| `CurrencyValidatorTest` | Validates ISO-4217 currency codes (`USD`, `INR`, `EUR`) and rejects invalid strings | ✅ 21/21 Passed |
-| `IdempotencyServiceTest` | Tests SETNX lock acquisition, 24h replay, hash mismatch, and conflict detection | ✅ 5/5 Passed |
-| `PaymentServiceTest` | Verifies atomic payment creation, balanced double-entry ledgering, and outbox serialization | ✅ 2/2 Passed |
+| `CurrencyValidatorTest` | Validates ISO-4217 currency codes (`USD`, `INR`, `EUR`) and rejects invalid codes | ✅ Passed (21/21) |
+| `IdempotencyServiceTest` | Tests SETNX lock acquisition, 24h replay, hash mismatch, and conflict detection | ✅ Passed (5/5) |
+| `PaymentServiceTest` | Verifies atomic payment creation, balanced double-entry ledgering, and outbox serialization | ✅ Passed (2/2) |
 | `PaymentIntegrationTest` | End-to-end integration test with real PostgreSQL, Redis, and Flyway migrations | ✅ Passed |
-| `IdempotencyConcurrencyTest` | 50 concurrent threads firing the same Idempotency-Key simultaneously $\to$ exactly 1 payment created | ✅ Passed |
+| `IdempotencyConcurrencyTest` | 50 concurrent threads firing the same Idempotency-Key $\to$ exactly 1 payment created | ✅ Passed |
 | `OutboxPublisherIntegrationTest`| Verifies scheduled outbox worker publishing to Kafka and event consumption | ✅ Passed |
 
 ---
 
-## 12. How to Run (Docker & Local)
+## 13. How to Run (Docker, Local & Frontend)
 
-### Option 1: Full Docker Compose Setup (One Command)
-
+### Step 1: Start Full Backend Stack via Docker Compose
 ```bash
-git clone https://github.com/example/idempotent-payments-ledger.git
-cd idempotent-payments-ledger
-
 docker compose up --build -d
 ```
 
-Services exposed:
-- **API Server & Swagger UI**: http://localhost:8080/swagger-ui.html
+Services started:
+- **API Server & Developer Lab**: http://localhost:8080/
+- **Interactive Swagger UI**: http://localhost:8080/swagger-ui.html
 - **Spring Actuator Health**: http://localhost:8080/actuator/health
-- **Prometheus Metrics**: http://localhost:8080/actuator/prometheus
-- **PostgreSQL**: `localhost:5432` (User: `postgres`, Pass: `postgres`, DB: `payments_db`)
-- **Redis**: `localhost:6379`
-- **Kafka**: `localhost:9092`
+- **PostgreSQL 16**: `localhost:5432`
+- **Redis 7**: `localhost:6379`
+- **Apache Kafka (KRaft)**: `localhost:9092`
 
 ---
 
-### Option 2: Local Development Setup
-
-1. **Start Infrastructure**:
-   ```bash
-   docker compose up postgres redis kafka zookeeper -d
-   ```
-2. **Run Spring Boot API**:
-   ```bash
-   mvn spring-boot:run
-   ```
+### Step 2: Start NovaStore React Storefront
+```bash
+cd frontend
+npm install
+npm run dev
+```
+Open **`http://localhost:5173`** in your browser.
 
 ---
 
-## 13. Architectural Trade-offs & Deep Dive
+## 14. Architectural Trade-offs & Engineering Decisions
 
 | Architecture Choice | Why We Chose It | Alternative Considered | Trade-off / Rationale |
 |---|---|---|---|
-| **Redis for Idempotency** | In-memory atomic `SETNX` executes in sub-millisecond time. | DB Unique Constraints | DB constraints add lock contention on hot transaction tables; Redis offloads duplicate traffic before hitting the database. |
-| **Transactional Outbox Polling** | Clean, portable, zero external daemon requirements. | Debezium / CDC (Change Data Capture) | Debezium requires Kafka Connect infrastructure. Polling with `SKIP LOCKED` is lightweight, fault-tolerant, and easy to deploy in V1. |
-| **Double-Entry Ledgering** | Provides balanced, auditable financial records (`DEBIT` + `CREDIT`). | Single Balance Column | Updating a mutable `balance` column loses transaction provenance and makes audit reconciliation impossible. |
-| **Optimistic Locking (`@Version`)** | High throughput without holding database row locks during external RPC calls. | Pessimistic Locking (`SELECT FOR UPDATE`) | Pessimistic locking creates database connection exhaustion under high concurrency. Optimistic locking is superior for low-conflict write scenarios. |
+| **Redis for Idempotency** | In-memory atomic `SETNX` executes in sub-millisecond time. | DB Unique Constraints | DB constraints add lock contention on hot transaction tables; Redis offloads duplicate traffic before touching PostgreSQL. |
+| **Transactional Outbox Polling** | Clean, portable, zero external daemon requirements. | Debezium / CDC | Debezium requires Kafka Connect cluster infrastructure. Polling with `SKIP LOCKED` is lightweight, highly reliable, and easy to deploy in V1. |
+| **Double-Entry Bookkeeping** | Provides balanced, auditable financial records (`DEBIT` + `CREDIT`). | Single Balance Column | Updating a mutable balance column destroys audit provenance and makes financial reconciliation impossible. |
+| **Optimistic Locking (`@Version`)** | High throughput without holding database row locks during external RPC calls. | Pessimistic Locking (`SELECT FOR UPDATE`) | Pessimistic locking creates database connection pool exhaustion under high concurrency. Optimistic locking is superior for payment state transitions. |
