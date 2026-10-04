@@ -31,6 +31,7 @@ jobs:
         with:
           name: surefire-reports
           path: target/surefire-reports/
+          if-no-files-found: ignore
           retention-days: 7
 
       - name: Upload JaCoCo Coverage Report
@@ -39,4 +40,5 @@ jobs:
         with:
           name: jacoco-coverage
           path: target/site/jacoco/
+          if-no-files-found: ignore
           retention-days: 7

@@ -19,12 +19,17 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Concurrency stress test that executes 50 parallel requests directly against
  * the live running Docker Compose API server at http://localhost:8080.
  */
+@Tag("live")
+@EnabledIfEnvironmentVariable(named = "RUN_LIVE_TESTS", matches = "true")
 public class IdempotencyConcurrencyLiveTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
