@@ -7,29 +7,29 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
-@Testcontainers
 public abstract class AbstractIntegrationTest {
 
-    @Container
-    protected static final PostgreSQLContainer<?> postgres =
-            new PostgreSQLContainer<>(DockerImageName.parse("postgres:16-alpine"))
-                    .withDatabaseName("payments_test_db")
-                    .withUsername("test")
-                    .withPassword("test");
+    protected static final PostgreSQLContainer<?> postgres;
+    protected static final RedisContainer redis;
+    protected static final KafkaContainer kafka;
 
-    @Container
-    protected static final RedisContainer redis =
-            new RedisContainer(DockerImageName.parse("redis:7-alpine"));
+    static {
+        postgres = new PostgreSQLContainer<>(DockerImageName.parse("postgres:16-alpine"))
+                .withDatabaseName("payments_test_db")
+                .withUsername("test")
+                .withPassword("test");
+        postgres.start();
 
-    @Container
-    protected static final KafkaContainer kafka =
-            new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.5.0"));
+        redis = new RedisContainer(DockerImageName.parse("redis:7-alpine"));
+        redis.start();
+
+        kafka = new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.5.0"));
+        kafka.start();
+    }
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
@@ -41,7 +41,7 @@ public abstract class AbstractIntegrationTest {
 
         // Redis properties
         registry.add("spring.data.redis.host", redis::getHost);
-        registry.add("spring.data.redis.port", () -> redis.getFirstMappedPort().toString());
+        registry.add("spring.data.redis.port", redis::getFirstMappedPort);
 
         // Kafka properties
         registry.add("spring.kafka.bootstrap-servers", kafka::getBootstrapServers);

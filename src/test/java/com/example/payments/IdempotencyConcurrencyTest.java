@@ -29,6 +29,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 class IdempotencyConcurrencyTest extends AbstractIntegrationTest {
 
     @Autowired
@@ -36,6 +39,9 @@ class IdempotencyConcurrencyTest extends AbstractIntegrationTest {
 
     @Autowired
     private PaymentRepository paymentRepository;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Test
     @DisplayName("Concurrent requests with identical Idempotency-Key must produce exactly ONE payment in DB")
@@ -71,22 +77,28 @@ class IdempotencyConcurrencyTest extends AbstractIntegrationTest {
                 try {
                     startLatch.await(); // release all threads at once
 
-                    ResponseEntity<PaymentResponse> response = restTemplate.exchange(
+                    ResponseEntity<String> response = restTemplate.exchange(
                             "/api/v1/payments",
                             HttpMethod.POST,
                             entity,
-                            PaymentResponse.class
+                            String.class
                     );
 
                     if (response.getStatusCode() == HttpStatus.CREATED) {
                         createdCount.incrementAndGet();
                         if (response.getBody() != null) {
-                            createdPaymentIds.add(response.getBody().paymentId());
+                            JsonNode node = objectMapper.readTree(response.getBody());
+                            if (node.has("paymentId")) {
+                                createdPaymentIds.add(UUID.fromString(node.get("paymentId").asText()));
+                            }
                         }
                     } else if (response.getStatusCode() == HttpStatus.OK) {
                         cachedReplayCount.incrementAndGet();
                         if (response.getBody() != null) {
-                            createdPaymentIds.add(response.getBody().paymentId());
+                            JsonNode node = objectMapper.readTree(response.getBody());
+                            if (node.has("paymentId")) {
+                                createdPaymentIds.add(UUID.fromString(node.get("paymentId").asText()));
+                            }
                         }
                     } else if (response.getStatusCode() == HttpStatus.CONFLICT) {
                         conflictCount.incrementAndGet();

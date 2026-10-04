@@ -1,8 +1,11 @@
 name: Security & Vulnerability Scan
 
 on:
+  push:
+    branches: [ main, master, feature/* ]
   pull_request:
     branches: [ main, master ]
+  workflow_dispatch:
   schedule:
     - cron: '0 0 * * 0' # Run weekly on Sunday
 
