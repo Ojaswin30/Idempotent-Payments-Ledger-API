@@ -14,6 +14,7 @@ import org.testcontainers.utility.DockerImageName;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
 @Testcontainers
+@SuppressWarnings("resource")
 public abstract class AbstractIntegrationTest {
 
     @Container
@@ -41,7 +42,7 @@ public abstract class AbstractIntegrationTest {
 
         // Redis properties
         registry.add("spring.data.redis.host", redis::getHost);
-        registry.add("spring.data.redis.port", () -> redis.getFirstMappedPort().toString());
+        registry.add("spring.data.redis.port", redis::getFirstMappedPort);
 
         // Kafka properties
         registry.add("spring.kafka.bootstrap-servers", kafka::getBootstrapServers);
